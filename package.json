@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "weather-js": "^2.0.0"
+  },
+  "name": "date-and-weather",
+  "version": "1.0.0",
+  "description": "this package displays the date and the weather in Clerieux",
+  "main": "weather.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "weather": "node weather.js",
+    "today": "node today.js"
+  },
+  "author": "augustin",
+  "license": "ISC"
+}
