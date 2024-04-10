@@ -1,10 +1,9 @@
 {
   "name": "alps_drive",
   "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node main.mjs"
+    "dev": "nodemon main.js"
   },
   "author": "",
   "license": "ISC",

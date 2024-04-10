@@ -102,4 +102,6 @@ app.listen(port, () => {
 })
 ```
 
+`npm install -g nodemon`
+
 `curl -X GET localhost:3000`
