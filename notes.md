@@ -89,17 +89,17 @@ If 5 Requests requiring 5 seconds of treatment each  are in the Event Queue, the
 
 app.js :
 ```js
-const express = require('express')
-const app = express()
-const port = 3000
-
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
-
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+    const express = require('express')
+    const app = express()
+    const port = 3000
+    app.get('/', (req, res) => {
+        res.send('Hello World!')
+        console.log("New connexion") // display on server
+    })
+    
+    app.listen(port, () => {
+        console.log(`Example app listening on port ${port}`) // display on client
+    })
 ```
 
 `npm install -g nodemon`
