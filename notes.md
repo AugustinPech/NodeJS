@@ -75,6 +75,31 @@ If 5 Requests requiring 5 seconds of treatment each  are in the Event Queue, the
 
 `nvm install-latest-npm`
 
+## Premiers pas
 `node`
 
 `mv .nvm .nvmrc`
+## Nouveau projet NodeJS
+[doc npm init](https://docs.npmjs.com/cli/v10/commands/npm-init/)
+[doc sur les packages](https://www.digitalocean.com/community/tutorials/how-to-use-node-js-modules-with-npm-and-package-json-fr)
+[doc expressjs](https://expressjs.com/en/starter/installing.html)
+`npm init`
+
+`npm install express`
+
+app.js :
+```js
+const express = require('express')
+const app = express()
+const port = 3000
+
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
+
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
+})
+```
+
+`curl -X GET localhost:3000`
