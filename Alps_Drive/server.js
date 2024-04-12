@@ -126,7 +126,7 @@ class Server {
         this.app.post('/api/drive', async (req, res, next) => {
             const name = req.query.name;
             try {
-                if (!name.match(/^[0-9a-zA-Z]+$/)) {
+                if (!name.match(/^[a-zA-Z\.\_]+$/gm)) {
                     return res.status(400).send('Name contains non-alphanumeric characters');
                 }
                 const folderPath = this.path.join(this.tmp, name);
@@ -137,7 +137,38 @@ class Server {
             }
         });
     }
-
+    deleteDirectory=()=>{
+        this.app.delete('/api/drive/:name', async (req, res) => {
+            const name = req.params.name;
+            try {
+                if (!name.match(/^[a-zA-Z\.\_]+$/gm)) {
+                    return res.status(400).send('Name contains non-alphanumeric characters');
+                }
+                const folderPath = this.path.join(this.tmp, name);
+                console.log(6,folderPath)
+                await this.fs.promises.rmdir(folderPath, { recursive: true });
+                return res.sendStatus(204);
+            } catch (error) {
+                return res.status(500).send(`Cannot delete the folder: ${error}`);
+            }
+        });
+    }
+    deleteFile= ()=> {
+        this.app.delete('/api/drive/:name', async (req, res) => {
+            const name = req.params.name;
+            try {
+                if (!name.match(/^[a-zA-Z\.\_]+$/gm)) {
+                    console.log(name)
+                    return res.status(400).send('Name contains non-alphanumeric characters other tan . and _');
+                }
+                const filePath = this.path.join(this.tmp, name);
+                await this.fs.promises.unlink(filePath);
+                return res.sendStatus(204);
+            } catch (error) {
+                return res.status(500).send(`Cannot delete the file: ${error}`);
+            }
+        });
+    }
 }
 
 
