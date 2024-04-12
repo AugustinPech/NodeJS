@@ -105,3 +105,7 @@ app.js :
 `npm install -g nodemon`
 
 `curl -X GET localhost:3000`
+## les CORS
+Les CORS sont une protection dans le navigateur.
+Si le navigateur intéroge le port localhost:8080 mais qu'il reçoit une requète pourlocalhost:3000 alors il bloque tout.
+Mais si on passe par le terminal, on accède au serveur, il n'est pas protégé.
