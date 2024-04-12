@@ -1,7 +1,7 @@
 class Server {
     constructor(port) {
-        this.express = require('express')
         this.fs = require('fs')
+        this.express = require('express')
         this.os = require('os'); 
         this.path = require('path'); 
         this.app = this.express()
@@ -50,6 +50,27 @@ class Server {
             }
         })
     }
+    getFilesInDirectory = async (directoryPath) => {
+        const files = await this.fs.promises.readdir(directoryPath, {withFileTypes : true});
+        return files.map(file => {
+            if(file.isDirectory()){
+                return {
+                    name: file.name,
+                    isFolder: file.isDirectory(),
+                }
+            } else {
+                console.log("2",this.path.join(directoryPath,file.name))
+                const fileSize =this.fs.statSync(this.path.join(directoryPath,file.name)).size
+                console.log("3",directoryPath,fileSize)
+                return {
+                    name: file.name,
+                    size : fileSize,
+                    isFolder: file.isDirectory(),
+                    path: this.path.join(directoryPath,file.name)
+                }
+            }
+        });
+    }
     getDirectory = (path)=>{
          /*
         * This function manages the get request on the  route path
@@ -58,25 +79,9 @@ class Server {
             path,
             async (req, res) => {                
                 try{                    
-                    const files = await this.fs.promises.readdir("/tmp/alps_drive",{withFileTypes : true})
-                    const filesInexpectedFormat=files.map(
-                        file => {
-                            if(file.isDirectory()){
-                                return {
-                                    name: file.name,
-                                    isFolder: file.isDirectory(),
-                                }
-                            } else {
-                                return {
-                                    name: file.name,
-                                    size: this.fs.statSync(this.path.join(this.tmp,file.name)).size,
-                                    isFolder: file.isDirectory(),
-                                }
-                            }
-                        }
-                    )
+                    const files = await this.getFilesInDirectory("/tmp/alps_drive")
                     console.log("New connexion on"+path)
-                    res.status(200).send(filesInexpectedFormat)
+                    res.status(200).send(files)
                 } catch (error) {
                     res.status(500).send(`Cannot get the drive: ${error}`);
                 }
@@ -87,39 +92,56 @@ class Server {
         /*
         * This function manages the get request on the route '/api/drive/:name'
         * /^\/api\/drive\/[a-zA-Z]+(?:\.[a-zA-Z]{4})?$/gm,
+        * /home/augustin/Downloads
         */
         this.app.get(
             '/api/drive/:name',
             async (req, res) => {
                 try {
-                    const files = await this.fs.promises.readdir(
-                            "/tmp/alps_drive",{withFileTypes : true})
-                    let file = files.find(element => element.name === req.params.name)
-                    file.isFolder=file.isDirectory()
-                    if(file.isFolder){                        
-                        this.getDirectory(this.path.join('/api/drive/',req.params.name))                        
+                    const files = await this.getFilesInDirectory(this.path.join("/tmp/alps_drive"));
+                    let file = files.find(element => element.name === req.params.name);
+                    console.log(file,files)
+                    console.log('New request for /api/drive/'+req.params.name)
+                    if(file === undefined){
+                        console.log('File /api/drive/'+req.params.name+' not found')
+                        res.status(404).send(`Cannot find the file ${req.params.name}`)
+                    } else {
+                        console.log("1",file)                        
+                        if(file.isFolder){
+                            const content= await this.getFilesInDirectory(this.path.join("/tmp/alps_drive",file.name));
+                                console.log("4",this.path.join("/tmp/alps_drive",file.name))
+                                res.status(200).send(content)                   
+                        } else {
+                            console.log("5",file)
+                            res.status(200).download(file.path)
+                        }
                     }
-                    // if(file.isFolder){
-                    //     file.content= await this.fs.promises.readdir(
-                    //         this.path.join(this.tmp,req.params.name),
-                    //         {withFileTypes : true}
-                    //     )
-                    //     file.content.map(element => {
-                    //         element.size=this.fs.statSync(this.path.join(this.tmp,req.params.name,element.name)).size
-                    //         element.isFolder=element.isDirectory()
-                    //     })
-                    // }
-                    // res.status(200).send(file.content)
-                    console.log('New request for  /api/drive/'+req.params.name)
                 } catch (error) {
-                    res.status(500).send(`Cannot get the drive: ${error}`);
+                    res.status(500).send(`Cannot get the file/folder : ${error}`);
                 }
             }
         )
     }
+    createDirectory = () => {
+        this.app.post('/api/drive', async (req, res, next) => {
+            const name = req.query.name;
+            try {
+                if (!name.match(/^[0-9a-zA-Z]+$/)) {
+                    return res.status(400).send('Name contains non-alphanumeric characters');
+                }
+                const folderPath = this.path.join(this.tmp, name);
+                await this.fs.promises.mkdir(folderPath, { recursive: true });
+                return res.sendStatus(201);
+            } catch (error) {
+                return res.status(500).send(`Cannot create the folder: ${error}`);
+            }
+        });
+    }
+
 }
 
 
+module.exports = {Server}
 
 // function start() {
 //     const express = require('express')
@@ -199,19 +221,6 @@ class Server {
 //     /*
 //     * This function manages the post request on the route '/api/drive/'
 //     */
-//     app.post(
-//             '/api/drive/',
-//             async (req, res, next) => {
-//                 try {
-//                     const name = req.query.name
-//                     const folderPath= path.join(os.tmpdir(),"alps_drive", name)
-//                     await fs.promises.mkdir(folderPath, {recursive: true})
-//                     return res.sendStatus(201);
-//                 } catch (error) {
-//                     return res.status(500).send(`Cannot create the folder: ${error}`);
-//                 }
-//             }
-//         );
 
 // }
 
