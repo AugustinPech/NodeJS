@@ -1,12 +1,15 @@
 class Server {
     constructor(port) {
+        this.regex = /^[a-zA-Z0-9\.\-\_]+$/gm
         this.fs = require('fs')
         this.express = require('express')
         this.os = require('os'); 
-        this.path = require('path'); 
+        this.path = require('path');
+        this.busboy=require('express-busboy') 
+        this.tmp= this.path.join(this.os.tmpdir(),"alps_drive")
         this.app = this.express()
         this.port = port
-        this.tmp= this.path.join(this.os.tmpdir(),"alps_drive")
+        this.ifFolderExists()
     }
     start = ()=>{
         /*
@@ -18,11 +21,20 @@ class Server {
            res.setHeader("Access-Control-Allow-Headers", "*");
            next();
         });
+        this.busboy.extend(this.app, {
+            upload: true,
+            path: this.os.tmpdir(),
+        });
         this.app.listen(
             this.port, () => {
                 console.log(`Example app listening on port ${this.port}`)
             }
         )
+    }
+    ifFolderExists = ()=> {
+        if (!this.fs.existsSync(this.path.join(this.tmp))){
+            this.fs.mkdirSync(this.path.join(this.tmp));
+        }
     }
     getRoot = ()=>{
         this.app.get('/', (req, res) => {
@@ -51,6 +63,7 @@ class Server {
         })
     }
     getFilesInDirectory = async (directoryPath) => {
+        console.log("getFilesInDirectory")
         const files = await this.fs.promises.readdir(directoryPath, {withFileTypes : true});
         return files.map(file => {
             if(file.isDirectory()){
@@ -59,9 +72,7 @@ class Server {
                     isFolder: file.isDirectory(),
                 }
             } else {
-                console.log("2",this.path.join(directoryPath,file.name))
                 const fileSize =this.fs.statSync(this.path.join(directoryPath,file.name)).size
-                console.log("3",directoryPath,fileSize)
                 return {
                     name: file.name,
                     size : fileSize,
@@ -77,10 +88,12 @@ class Server {
         */         
         this.app.get(
             path,
-            async (req, res) => {                
+            async (req, res) => {
+                console.log ("getDirectory")
+
                 try{                    
                     const files = await this.getFilesInDirectory("/tmp/alps_drive")
-                    console.log("New connexion on"+path)
+                    console.log("New connexion on "+path)
                     res.status(200).send(files)
                 } catch (error) {
                     res.status(500).send(`Cannot get the drive: ${error}`);
@@ -91,28 +104,25 @@ class Server {
     getFileByName =() =>{
         /*
         * This function manages the get request on the route '/api/drive/:name'
-        * /^\/api\/drive\/[a-zA-Z]+(?:\.[a-zA-Z]{4})?$/gm,
+        * /^[a-zA-Z\.\_]+$/gm is a regex that allows only alphanumeric characters, . and _
         * /home/augustin/Downloads
         */
         this.app.get(
             '/api/drive/:name',
             async (req, res) => {
+                console.log ("getFileByName")
                 try {
                     const files = await this.getFilesInDirectory(this.path.join("/tmp/alps_drive"));
                     let file = files.find(element => element.name === req.params.name);
-                    console.log(file,files)
                     console.log('New request for /api/drive/'+req.params.name)
                     if(file === undefined){
                         console.log('File /api/drive/'+req.params.name+' not found')
                         res.status(404).send(`Cannot find the file ${req.params.name}`)
-                    } else {
-                        console.log("1",file)                        
+                    } else {                       
                         if(file.isFolder){
                             const content= await this.getFilesInDirectory(this.path.join("/tmp/alps_drive",file.name));
-                                console.log("4",this.path.join("/tmp/alps_drive",file.name))
-                                res.status(200).send(content)                   
+                            res.status(200).send(content)                   
                         } else {
-                            console.log("5",file)
                             res.status(200).download(file.path)
                         }
                     }
@@ -126,7 +136,7 @@ class Server {
         this.app.post('/api/drive', async (req, res, next) => {
             const name = req.query.name;
             try {
-                if (!name.match(/^[a-zA-Z\.\_]+$/gm)) {
+                if (!name.match(this.regex )) {
                     return res.status(400).send('Name contains non-alphanumeric characters');
                 }
                 const folderPath = this.path.join(this.tmp, name);
@@ -137,15 +147,38 @@ class Server {
             }
         });
     }
+    uploadFile = () => {
+        this.app.put('/api/drive/', (req, res) => {
+            console.log("uploadFile")
+            const name = req.files.file.filename;
+            console.log("FILES", req.files)
+            try {
+                if (!name.match(this.regex )) {
+                    return res.status(400).send('Name contains non-alphanumeric characters');
+                }
+                const filePath = this.path.join(this.tmp, name);
+                this.fs.rename(req.files.file.file, filePath, (err) => {
+                    if (err) {
+                        return res.status(500).send(`Cannot upload the file: ${err}`);
+                    }
+                })
+                console.log(filePath);
+                
+                return res.sendStatus(201);
+            } catch (error) {
+                return res.status(500).send(`Cannot upload the file: ${error}`);
+            }
+        })
+    }
     deleteDirectory=()=>{
         this.app.delete('/api/drive/:name', async (req, res) => {
+            console.log ("deleteDirectory")
             const name = req.params.name;
             try {
-                if (!name.match(/^[a-zA-Z\.\_]+$/gm)) {
+                if (!name.match(this.regex )) {
                     return res.status(400).send('Name contains non-alphanumeric characters');
                 }
                 const folderPath = this.path.join(this.tmp, name);
-                console.log(6,folderPath)
                 await this.fs.promises.rmdir(folderPath, { recursive: true });
                 return res.sendStatus(204);
             } catch (error) {
@@ -155,9 +188,10 @@ class Server {
     }
     deleteFile= ()=> {
         this.app.delete('/api/drive/:name', async (req, res) => {
+            console.log("deleteFile")
             const name = req.params.name;
             try {
-                if (!name.match(/^[a-zA-Z\.\_]+$/gm)) {
+                if (!name.match(this.regex)) {
                     console.log(name)
                     return res.status(400).send('Name contains non-alphanumeric characters other tan . and _');
                 }
@@ -170,89 +204,5 @@ class Server {
         });
     }
 }
-
-
-module.exports = {Server}
-
-// function start() {
-//     const express = require('express')
-//     const fs = require('fs')
-//     const os = require('os'); 
-//     const path = require('path'); 
-//     const app = express()
-//     const port = 3000
-//     /*
-//     * This function is a middleware that allows CORS
-//     */
-//     app.use( function (req, res, next) {
-//         res.setHeader("Access-Control-Allow-Origin", "*");
-//         res.setHeader('Access-Control-Allow-Methods', '*');
-//         res.setHeader("Access-Control-Allow-Headers", "*");
-//         next();
-//         });
-//     /*
-//     * This function manages the get request on the route '/'
-//     */
-//    app.get('/', (req, res) => {
-//        try {
-//             res.status(200).send('Hello World!')
-//             console.log("New connexion")
-//         } catch (error) {
-//             res.status(500).send(`Cannot get the root: ${error}`);
-//         }
-//     })
-//     /*
-//     * This function manages the get request on the  route '/api/drive/'
-//     */
-//     app.get(
-//         '/api/drive/',
-//         async (req, res) => {
-//             try{
-//                 const files = await fs.promises.readdir("/tmp/alps_drive",{withFileTypes : true})
-//                 const filesInexpectedFormat=files.map(
-//                     file => {
-//                         return {
-//                             name: file.name,
-//                             isFolder: file.isDirectory(),
-//                         }
-//                     }
-//                 )
-//                 console.log("New connexion on /api/drive/")
-//                 res.status(200).send(filesInexpectedFormat)
-//             } catch (error) {
-//                 res.status(500).send(`Cannot get the drive: ${error}`);
-//             }
-//         }
-//     )
-//     /*
-//     * This function manages the post request on the route '/api/drive/:name'
-//     * /^\/api\/drive\/[a-zA-Z]+(?:\.[a-zA-Z]{4})?$/gm,
-//     */
-//     app.get(
-//         '/api/drive/:name',
-//         async (req, res) => {
-//             try {
-//                 const files = await fs.promises.readdir("/tmp/alps_drive",{withFileTypes : true})
-//                 const filesInexpectedFormat=files.map(
-//                     file => {
-//                         return {
-//                             name: file.name,
-//                             isFolder: file.isDirectory(),
-//                         }
-//                     }
-//                 )
-//                 let target = filesInexpectedFormat.find(file => file.name === req.params.name)
-//                 console.log("New connexion on /api/drive/")
-//                 res.status(200).send(target)
-//             } catch (error) {
-//                 res.status(500).send(`Cannot get the drive: ${error}`);
-//             }
-//         }
-//     )
-//     /*
-//     * This function manages the post request on the route '/api/drive/'
-//     */
-
-// }
 
 module.exports = {Server}
